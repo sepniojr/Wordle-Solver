@@ -48,7 +48,7 @@ How to select the next value for that variable?
 TODO: Important questions to answer: What happens if the user enters a word and it's all wrong? How do we decide which word to recommend them?
 """
 valid_words = []
-
+impossible_pairs = []
 class Word:
     """
      Class to represent a 5-letter word and an assignment of letters to each variable in the word.
@@ -87,7 +87,7 @@ class Word:
             elif result[i] == 'G':
                 row.append(word[i])
 
-        self._cells.append(row)
+        self._cells.extend(row)
         pass
         
 
@@ -125,6 +125,43 @@ class MRV:
 
         return var
 
+class AC3:
+
+    def consistency(self, word):
+        pass
+
+    def remove_domain_pairs(self, word):
+        for i in range(word.get_width()):
+            if len(word.get_cells()[i]) == 1:
+                # For each letter that we know exists in the word we want to constrain variables on either side
+                # If the letter is in the first variable we only need to constrain the variable to the right, i.e. check cases where the letter is the first letter in the impossible pair
+                # If the letter is the 2nd,3rd,4th variable, we need to check cases where the letter is in either pair and constrain variables on either side accordingly
+                # If the letter is the 5th variable, we only need to constrain the variable to the left, i.e. check cases where the letter is the second letter in the impossible pair
+                for pair in impossible_pairs:
+                    if i == 1 or i == 2 or i == 3:
+                        if word.get_cells()[i] == pair[0]:
+                            new_domain = word.get_cells()[i+1].replace(pair[1], '')
+                            word.get_cells()[i+1] = new_domain
+                        if word.get_cells()[i] == pair[1]:
+                            new_domain = word.get_cells()[i-1].replace(pair[0], '')
+                            word.get_cells()[i-1] = new_domain
+                    elif i == 0:
+                        # This is the first variable in the word
+                        if word.get_cells()[i] == pair[0]:
+                            new_domain = word.get_cells()[i+1].replace(pair[1], '')
+                            word.get_cells()[i+1] = new_domain
+                    elif i == 4:
+                        if word.get_cells()[i] == pair[1]:
+                            new_domain = word.get_cells()[i-1].replace(pair[0], '')
+                            word.get_cells()[i-1] = new_domain
+                        # This is the last variable in the word
+                pass
+
+
+        pass
+
+
+
 def is_valid_result(result_guessed_word):
     for char in result_guessed_word:
         if char not in ['X','Y','G']:
@@ -149,6 +186,10 @@ if __name__ == "__main__":
         valid_word = valid_word.strip()
         valid_words.append(valid_word)
     
+    file = open('impossible-letter-combos.txt', 'r')
+    for pair in file:
+        pair = pair.strip()
+        impossible_pairs.append(pair)
 
     while(True):
         guessed_word = input("Please enter the word you guessed: ").upper()
@@ -166,4 +207,9 @@ if __name__ == "__main__":
 
         word = Word()
         word.init_cells(guessed_word,result_guessed_word)
+        print(word.get_cells())
+        mrv = MRV()
+        ac3 = AC3()
 
+        ac3.remove_domain_pairs(word)
+        print(word.get_cells())
