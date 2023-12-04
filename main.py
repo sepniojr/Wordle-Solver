@@ -37,7 +37,8 @@ How to select the next variable?
     - Choose the next variable based on whichever slot has the smallest domain. (MRV selector)
 
 How to select the next value for that variable?
-    - We should prioritize any letters that we know are present in the word (e.g. Yellow letters) (How to do this?) (Set up priority queue of letters?)
+    - We should prioritize any letters that we know are present in the word (e.g. Yellow letters)
+
     - Look at the domain of the variable and select the letter with the highest frequency in that slot of all valid Wordle words.
     - Possible sol'n: Organize the domain list of each variable and order it by Yellow letters first and then go down by letter frequency in that slot
         - Need a function that checks the yellow letters list before each search and moves the yellow letters to the front of the domain string
@@ -49,6 +50,12 @@ TODO: Important questions to answer: What happens if the user enters a word and 
 """
 valid_words = []
 impossible_pairs = []
+var1 = {}
+var2 = {}
+var3 = {}
+var4 = {}
+var5 = {}
+
 class Word:
     """
      Class to represent a 5-letter word and an assignment of letters to each variable in the word.
@@ -62,7 +69,12 @@ class Word:
         self._domains = []
         self._cells = []
         self._yellow_letters = []
-        self._complete_domain = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        self._grey_letters = []
+        self._complete_domains = ["SPBCMTARDGFLHNWKOEVJUYIZQX",
+                                  "AOEIURLHNYTPMCWKSBDGXVFZQJ",
+                                  "ARINOELUTSMCDGPBKWVYFZHXJQ",
+                                  "EAITNLORSKDUGPCMHBFVZWYJXQ",
+                                  "SEYADTRNLOHIKMGPCUFXBWZVQJ"]
 
 
     def init_cells(self, word_string, result_string):
@@ -70,30 +82,64 @@ class Word:
         This function takes in the word the user guessed and the result of that word and sets the initial domain of each cell accordingly
         This function is only called once; Further modifications to the domain will be done in a separate consistency function
 
-        If a letter in a guessed word is grey, that letter is removed from the domain of the variable
+        If a letter in a guessed word is grey, that letter is removed from the domain of all variables
         If a letter in a guessed word is yellow, that letter is removed from the domain of the variable but put into a yellow letter list for later
         If a letter in a guessed word is green, the domain of the variable is set to that letter
         """
         word = list(word_string)
         result = list(result_string)
         row = []
+        self._cells = []
+        #self._grey_letters = []
+        #self._yellow_letters = []
 
         for i in range(len(word_string)):
             if result[i] == 'X':
-                row.append(self._complete_domain.replace(word[i], ''))
-            elif result[i] == 'Y':
-                row.append(self._complete_domain.replace(word[i], ''))
+                # Remove this letter from all domains of the word
+                row.append(self._complete_domains[i].replace(word[i], ''))
+                self._grey_letters.append(word[i])
+            if result[i] == 'Y':
+                row.append(self._complete_domains[i].replace(word[i], ''))
                 self._yellow_letters.append(word[i])
             elif result[i] == 'G':
                 row.append(word[i])
 
+        #print("Row: ", row)
         self._cells.extend(row)
+
+        for grey_letter in self._grey_letters:
+            for i in range(len(self.get_cells())):
+                if grey_letter in self.get_cells()[i] and len(self.get_cells()[i]) != 1:
+                    new_domain = self.get_cells()[i].replace(grey_letter, '')
+                    self.get_cells()[i] = new_domain
+
+        #FIXME: This is a test to adding the yellow letters to the front of the domain. Later on maybe make this its own function instead
+        for yellow_letter in self._yellow_letters:
+            for i in range(len(self.get_cells())):
+                if yellow_letter in self.get_cells()[i]:
+                    new_domain = self.get_cells()[i].replace(yellow_letter, '')
+                    self.get_cells()[i] = yellow_letter + new_domain
+
+        print(self.get_cells())
         pass
-        
+
+    def remove_yellow_letters(self, letter):
+        self._yellow_letters.remove(letter)
+
+    def get_yellow_letters(self):
+        return self._yellow_letters
+    
+    def get_grey_letters(self):
+        return self._grey_letters
+    
+    def get_cell_string(self):
+        return ''.join(self.get_cells())
 
     def copy(self):
         copy_word = Word()
-        copy_word._cells = self._cells.copy()
+        copy_word._cells = [cell[:] for cell in self._cells]
+        copy_word._yellow_letters = [cell[:] for cell in self._yellow_letters]
+        #print("Copy cells: ", copy_word.get_cells())
         return copy_word
     
     def get_cells(self):
@@ -103,7 +149,7 @@ class Word:
         return self._width
 
     def is_solution(self):
-        if self.get_cell_string in valid_words:
+        if self.get_cell_string().lower() in valid_words:
             return True
         return False
     
@@ -115,13 +161,15 @@ class MRV:
 
         # Set the smallest tentative domain to the largest possible domain
         smallest_domain = 27
-
+        var = None
         # Iterate through cells
         for i in range(word.get_width()):
             if (len(word.get_cells()[i]) < smallest_domain and len(word.get_cells()[i]) != 1):
                 smallest_domain = len(word.get_cells()[i])
                 var = i
 
+        if var is None:
+            pass
 
         return var
 
@@ -160,6 +208,52 @@ class AC3:
 
         pass
 
+class Backtracking:
+
+    def search(self, word, var_selector, ac3):
+
+        if word.is_solution():
+            return word
+        
+
+        i = var_selector.select_variable(word)
+        print("Selecting new variable ", i)
+
+        if i is None:
+            return None
+        
+        for letter in word.get_cells()[i]:
+            if word.get_yellow_letters():
+                # If there are yellow cells
+                print(word.get_yellow_letters())
+                word.remove_yellow_letters(letter)
+
+
+            copy_word = word.copy()
+            copy_word.get_cells()[i] = letter
+
+            # FIXME: Somehow check and maintain yellow letter list such that it stays at the front of the domain list until it has been found (across words specifically)
+            # For example, if we guess WATER and then another word but we didn't find the right spot for T, then T will not be at the front of the domain list once we enter a new word,
+            # even though it is still a priority value to find
+            # Same thing if the letters are grey - the list of letters is not maintained
+            # Will probably have to write a separate function to do this because init_cells() does this but is only called once
+
+            # Lets say the word is WATER and the outcome is XXYXX. We put T to the front of the domains of all over variables but the middle one
+            # Whatever variable is next chosen by MRV will be set to T. Now we should remove T from the front of the domain of the other variables.
+            # Perhaps instead of moving the domain of T to the front of the queue we just add it to the front of the queue and keep 2 copies of the T in the domain list?
+            # This way it would be easier to remove from the front of the queue without having to manually re-add it into the domain list.
+
+            # If we implement this then I think that our algorithm will be a lot better because it will actually keep in priority the letters we still need to find
+            # Although things may be tricky when dealing with creating new Word objects and maintaining this list of yellow variables to keep.
+
+            ac3.remove_domain_pairs(copy_word)
+            print(copy_word.get_cells())
+            rb = self.search(copy_word, var_selector, ac3)
+            if rb and rb.is_solution():
+                return rb
+
+        return None
+
 
 
 def is_valid_result(result_guessed_word):
@@ -179,7 +273,9 @@ def is_valid_word(guessed_word):
         return False
     return True
 
+
 if __name__ == "__main__":
+    word = Word()  # Initialize Word object outside the loop
 
     file = open('valid-wordle-words.txt', 'r')
     for valid_word in file:
@@ -191,7 +287,7 @@ if __name__ == "__main__":
         pair = pair.strip()
         impossible_pairs.append(pair)
 
-    while(True):
+    while True:
         guessed_word = input("Please enter the word you guessed: ").upper()
 
         if not is_valid_word(guessed_word):
@@ -204,12 +300,16 @@ if __name__ == "__main__":
         if not is_valid_result(result_guessed_word):
             print("NOT A VALID INPUT")
             break
+        
+        # Update the existing Word object with the obtained guess information
 
-        word = Word()
-        word.init_cells(guessed_word,result_guessed_word)
-        print(word.get_cells())
+        word.init_cells(guessed_word, result_guessed_word)
+        #print(word.get_cells())
+
         mrv = MRV()
         ac3 = AC3()
-
         ac3.remove_domain_pairs(word)
-        print(word.get_cells())
+
+        bt = Backtracking()
+        sol = bt.search(word.copy(), mrv, ac3)
+        print(sol.get_cell_string())
