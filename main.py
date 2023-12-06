@@ -69,7 +69,7 @@ class Word:
         self._domains = []
         self._cells = []
         self._yellow_letters = []
-        self._grey_letters = []
+        self._grey_letters = ['','','','','']
         self._complete_domains = ["SPBCMTARDGFLHNWKOEVJUYIZQX",
                                   "AOEIURLHNYTPMCWKSBDGXVFZQJ",
                                   "ARINOELUTSMCDGPBKWVYFZHXJQ",
@@ -90,38 +90,91 @@ class Word:
         result = list(result_string)
         row = []
         self._cells = []
-        #self._grey_letters = []
-        #self._yellow_letters = []
 
         for i in range(len(word_string)):
+            if result[i] == 'G':
+                row.append(word[i])
+                if word[i] in self.get_yellow_letters():
+                    self.remove_yellow_letters(word[i])
+
             if result[i] == 'X':
                 # Remove this letter from all domains of the word
                 row.append(self._complete_domains[i].replace(word[i], ''))
-                self._grey_letters.append(word[i])
+                if word[i] not in self._grey_letters[i] and word[i] not in self._yellow_letters:
+                    for j in range(len(self.get_grey_letters())):
+                        self._grey_letters[j] += word[i]
             if result[i] == 'Y':
                 row.append(self._complete_domains[i].replace(word[i], ''))
-                self._yellow_letters.append(word[i])
-            elif result[i] == 'G':
-                row.append(word[i])
+                self._grey_letters[i] += word[i]
+                if word[i] not in self._yellow_letters:
+                    self._yellow_letters.append(word[i])
 
-        #print("Row: ", row)
+
+        print("YELLOW LETTERS: ", self.get_yellow_letters())
+
+
+
         self._cells.extend(row)
+        self.remove_letters_from_domain()
+        print(self.get_cells())
 
-        for grey_letter in self._grey_letters:
-            for i in range(len(self.get_cells())):
-                if grey_letter in self.get_cells()[i] and len(self.get_cells()[i]) != 1:
-                    new_domain = self.get_cells()[i].replace(grey_letter, '')
-                    self.get_cells()[i] = new_domain
+        pass
+    
+    def remove_letters_from_domain(self):
 
-        #FIXME: This is a test to adding the yellow letters to the front of the domain. Later on maybe make this its own function instead
         for yellow_letter in self._yellow_letters:
             for i in range(len(self.get_cells())):
                 if yellow_letter in self.get_cells()[i]:
                     new_domain = self.get_cells()[i].replace(yellow_letter, '')
                     self.get_cells()[i] = yellow_letter + new_domain
 
-        print(self.get_cells())
+        for i, (domain, grey_letters) in enumerate(zip(self.get_cells(), self.get_grey_letters())):
+            if len(self.get_cells()[i]) != 1:
+                self.get_cells()[i] = ''.join([char for char in domain if char not in grey_letters])
+        print("Grey letters ", self.get_grey_letters())
+        
+        for i in range(len(self.get_grey_letters())):
+            for yellow_letter in self.get_yellow_letters():
+                if yellow_letter in self.get_grey_letters()[i] and len(self.get_cells()[i]) != 1:
+                    pass
+
+        # Get a letter from the yellow list
+        # Iterate through list of grey letters
+        # If letter is not in a grey letter list and its domain is not 1, mark that spot down
+        # If letter is not in a grey letter list again and its domain is not 1, we leave the for loop because we haven't guaranteed that there is only 1 option for this yellow letter to be
+        # If it turns out that letter is the only one not in a grey list or not belonging to a cell with domain 1, set the spot we marked down to the letter
+
+        possible_single = 0
+        candidate = 0
+        letter = 0
+
+        for i in range(len(self.get_yellow_letters())):
+            count = 0
+            for j in range(len(self.get_grey_letters())):
+                count += 1
+                #print("YELLOW LETTER: " + self.get_yellow_letters()[i] + " | GREY LETTERS: " + self.get_grey_letters()[j] + " | COUNT: " + str(possible_single))
+                if possible_single > 1:
+                    break
+                elif self.get_yellow_letters()[i] not in self.get_grey_letters()[j] and len(self.get_cells()[j]) != 1:
+                    possible_single += 1
+                    candidate = j
+                    letter = i
+            if count == 5 and possible_single == 1:
+                print("HELLOOOOOOOOOOO")
+                self.get_cells()[candidate] = self.get_yellow_letters()[letter]
+                            
+
+
+
+        # If a letter is yellow and is present in grey letter cells where those cells domain's are not 1...
+        # Set the domain of the cell # which domain is not 1, and which the letter is not present in the grey letter cells, to the letter
+        # FOR EXAMPLE:
+        # SORER: XXYGG
+        # PRIER: XYYGG
+        # We know R has to be in the first slot.
+
         pass
+
 
     def remove_yellow_letters(self, letter):
         self._yellow_letters.remove(letter)
@@ -139,6 +192,7 @@ class Word:
         copy_word = Word()
         copy_word._cells = [cell[:] for cell in self._cells]
         copy_word._yellow_letters = [cell[:] for cell in self._yellow_letters]
+        copy_word._grey_letters = [cell[:] for cell in self._grey_letters]
         #print("Copy cells: ", copy_word.get_cells())
         return copy_word
     
@@ -168,8 +222,11 @@ class MRV:
                 smallest_domain = len(word.get_cells()[i])
                 var = i
 
-        if var is None:
-            pass
+
+        for i in range(len(word.get_yellow_letters())):
+            for j in range(word.get_width()):
+                if word.get_yellow_letters()[i] in word.get_cells()[j]:
+                    return j
 
         return var
 
@@ -217,36 +274,29 @@ class Backtracking:
         
 
         i = var_selector.select_variable(word)
-        print("Selecting new variable ", i)
 
         if i is None:
             return None
         
         for letter in word.get_cells()[i]:
-            if word.get_yellow_letters():
-                # If there are yellow cells
+            if letter in word.get_yellow_letters():
+                # If the letter selected is in the yellow letter list
                 print(word.get_yellow_letters())
                 word.remove_yellow_letters(letter)
-
+            #FIXME: Once a yellow letter is set to the cell, we should remove the yellow letter from the front of the domain list to reduce its priority
 
             copy_word = word.copy()
             copy_word.get_cells()[i] = letter
 
-            # FIXME: Somehow check and maintain yellow letter list such that it stays at the front of the domain list until it has been found (across words specifically)
-            # For example, if we guess WATER and then another word but we didn't find the right spot for T, then T will not be at the front of the domain list once we enter a new word,
-            # even though it is still a priority value to find
-            # Same thing if the letters are grey - the list of letters is not maintained
-            # Will probably have to write a separate function to do this because init_cells() does this but is only called once
 
             # Lets say the word is WATER and the outcome is XXYXX. We put T to the front of the domains of all over variables but the middle one
             # Whatever variable is next chosen by MRV will be set to T. Now we should remove T from the front of the domain of the other variables.
             # Perhaps instead of moving the domain of T to the front of the queue we just add it to the front of the queue and keep 2 copies of the T in the domain list?
             # This way it would be easier to remove from the front of the queue without having to manually re-add it into the domain list.
 
-            # If we implement this then I think that our algorithm will be a lot better because it will actually keep in priority the letters we still need to find
-            # Although things may be tricky when dealing with creating new Word objects and maintaining this list of yellow variables to keep.
-
             ac3.remove_domain_pairs(copy_word)
+            #copy_word.remove_letters_from_domain()
+
             print(copy_word.get_cells())
             rb = self.search(copy_word, var_selector, ac3)
             if rb and rb.is_solution():
