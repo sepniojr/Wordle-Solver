@@ -105,15 +105,15 @@ class Word:
                         self._grey_letters[j] += word[i]
 
             if result[i] == 'Y':
-                #row.append(self._complete_domains[i].replace(word[i], ''))
-                row.append(word[i] + self._complete_domains[i])
+                row.append(self._complete_domains[i].replace(word[i], ''))
+                #row.append(word[i] + self._complete_domains[i])
                 self._grey_letters[i] += word[i]
                 if word[i] not in self._yellow_letters:
                     self._yellow_letters.append(word[i])
 
 
         self._cells.extend(row)
-        print(self.get_cells())
+        print("initialized cells: ", self.get_cells())
         self.remove_letters_from_domain()
 
 
@@ -124,18 +124,14 @@ class Word:
         for yellow_letter in self._yellow_letters:
             for i in range(len(self.get_cells())):
                 if yellow_letter in self.get_cells()[i]:
-                    new_domain = self.get_cells()[i].replace(yellow_letter, '')
+                    new_domain = self.get_cells()[i]
                     self.get_cells()[i] = yellow_letter + new_domain
 
         for i, (domain, grey_letters) in enumerate(zip(self.get_cells(), self.get_grey_letters())):
             if len(self.get_cells()[i]) != 1:
                 self.get_cells()[i] = ''.join([char for char in domain if char not in grey_letters])
         print("Grey letters ", self.get_grey_letters())
-        
-        for i in range(len(self.get_grey_letters())):
-            for yellow_letter in self.get_yellow_letters():
-                if yellow_letter in self.get_grey_letters()[i] and len(self.get_cells()[i]) != 1:
-                    pass
+
 
         # Get a letter from the yellow list
         # Iterate through list of grey letters
@@ -179,18 +175,24 @@ class Word:
         Removes the domain 
         
         """
-
+        print(self.get_cells())
+        print("Letter to deprio: ", letter)
         for i in range(self.get_width()):
-            for j in range(len(self.get_cells()[i])):
-                if letter == self.get_cells()[i][j]:
-                    new_domain = self.get_cells()[i].replace(letter, '')
+            if len(self.get_cells()[i]) == 1:
+                continue
+            if self.get_cells()[i].count(letter) != 1:
+                index = self.get_cells()[i].find(letter)
+                print(i,index)
+                if index != -1:
+                    new_domain = self.get_cells()[i].replace(letter, '',1)
                     self.get_cells()[i] = new_domain
-                    break
+
         
         #FIXME: Might be removing all instances of the letter instead of just the first one
         print("NEW DOMAIN AFTER DEPRIO: ", self.get_cells())
 
-        pass
+        
+
     def remove_yellow_letters(self, letter):
         self._yellow_letters.remove(letter)
 
@@ -294,15 +296,18 @@ class Backtracking:
             return None
         
         for letter in word.get_cells()[i]:
-            if letter in word.get_yellow_letters():
-                # If the letter selected is in the yellow letter list
-                print(word.get_yellow_letters())
-                word.remove_yellow_letters(letter)
-                word.deprioritize_domain(letter)
+
+
             #FIXME: Once a yellow letter is set to the cell, we should remove the yellow letter from the front of the domain list to reduce its priority
 
             copy_word = word.copy()
+            print(copy_word.get_cells())
             copy_word.get_cells()[i] = letter
+            if letter in copy_word.get_yellow_letters():
+                # If the letter selected is in the yellow letter list
+                print(copy_word.get_yellow_letters())
+                copy_word.deprioritize_domain(letter)
+                copy_word.remove_yellow_letters(letter)
 
 
             # Lets say the word is WATER and the outcome is XXYXX. We put T to the front of the domains of all over variables but the middle one
@@ -323,6 +328,10 @@ class Backtracking:
 
 
 def is_valid_result(result_guessed_word):
+    if result_guessed_word == "I WON!":
+        print("\nYAY! Thanks for playing!")
+        exit()
+
     for char in result_guessed_word:
         if char not in ['X','Y','G']:
             return False
@@ -361,7 +370,7 @@ if __name__ == "__main__":
 
         print("\nPlease indicate the result of your guess")
 
-        result_guessed_word = input("X = letter is gray\nY = letter is yellow\nG = letter is green\n: ").upper()
+        result_guessed_word = input("X = letter is gray\nY = letter is yellow\nG = letter is green\nOR type 'I WON!' if you won :)\n: ").upper()
 
         if not is_valid_result(result_guessed_word):
             print("NOT A VALID INPUT")
