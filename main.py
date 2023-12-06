@@ -103,20 +103,19 @@ class Word:
                 if word[i] not in self._grey_letters[i] and word[i] not in self._yellow_letters:
                     for j in range(len(self.get_grey_letters())):
                         self._grey_letters[j] += word[i]
+
             if result[i] == 'Y':
-                row.append(self._complete_domains[i].replace(word[i], ''))
+                #row.append(self._complete_domains[i].replace(word[i], ''))
+                row.append(word[i] + self._complete_domains[i])
                 self._grey_letters[i] += word[i]
                 if word[i] not in self._yellow_letters:
                     self._yellow_letters.append(word[i])
 
 
-        print("YELLOW LETTERS: ", self.get_yellow_letters())
-
-
-
         self._cells.extend(row)
-        self.remove_letters_from_domain()
         print(self.get_cells())
+        self.remove_letters_from_domain()
+
 
         pass
     
@@ -175,7 +174,23 @@ class Word:
 
         pass
 
+    def deprioritize_domain(self, letter):
+        """
+        Removes the domain 
+        
+        """
 
+        for i in range(self.get_width()):
+            for j in range(len(self.get_cells()[i])):
+                if letter == self.get_cells()[i][j]:
+                    new_domain = self.get_cells()[i].replace(letter, '')
+                    self.get_cells()[i] = new_domain
+                    break
+        
+        #FIXME: Might be removing all instances of the letter instead of just the first one
+        print("NEW DOMAIN AFTER DEPRIO: ", self.get_cells())
+
+        pass
     def remove_yellow_letters(self, letter):
         self._yellow_letters.remove(letter)
 
@@ -283,6 +298,7 @@ class Backtracking:
                 # If the letter selected is in the yellow letter list
                 print(word.get_yellow_letters())
                 word.remove_yellow_letters(letter)
+                word.deprioritize_domain(letter)
             #FIXME: Once a yellow letter is set to the cell, we should remove the yellow letter from the front of the domain list to reduce its priority
 
             copy_word = word.copy()
