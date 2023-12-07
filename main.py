@@ -50,11 +50,7 @@ TODO: Important questions to answer: What happens if the user enters a word and 
 """
 valid_words = []
 impossible_pairs = []
-var1 = {}
-var2 = {}
-var3 = {}
-var4 = {}
-var5 = {}
+
 
 class Word:
     """
@@ -80,10 +76,9 @@ class Word:
     def init_cells(self, word_string, result_string):
         """
         This function takes in the word the user guessed and the result of that word and sets the initial domain of each cell accordingly
-        This function is only called once; Further modifications to the domain will be done in a separate consistency function
 
-        If a letter in a guessed word is grey, that letter is removed from the domain of all variables
-        If a letter in a guessed word is yellow, that letter is removed from the domain of the variable but put into a yellow letter list for later
+        If a letter in a guessed word is grey, that letter is removed from the domain of all variables and added to a list of grey letters for all variables
+        If a letter in a guessed word is yellow, that letter is removed from the domain of the variable, added to the grey list of that variable, and put into the yellow letter list
         If a letter in a guessed word is green, the domain of the variable is set to that letter
         """
         word = list(word_string)
@@ -92,13 +87,15 @@ class Word:
         self._cells = []
 
         for i in range(len(word_string)):
+            # If the letter is in the word and in the correct location
             if result[i] == 'G':
                 row.append(word[i])
                 if word[i] in self.get_yellow_letters():
                     self.remove_yellow_letters(word[i])
 
+            # If the letter is not in the word
             if result[i] == 'X':
-                # Remove this letter from all domains of the word
+                # Remove 
                 row.append(self._complete_domains[i].replace(word[i], ''))
                 if word[i] not in self._grey_letters[i] and word[i] not in self._yellow_letters:
                     for j in range(len(self.get_grey_letters())):
@@ -110,35 +107,47 @@ class Word:
                 self._grey_letters[i] += word[i]
                 if word[i] not in self._yellow_letters:
                     self._yellow_letters.append(word[i])
-
+                if len(self.get_yellow_letters()) > 5:
+                    print("\nList of yellow letters is impossibly large: ", len(self.get_yellow_letters()))
+                    print("Did you enter in something wrong?")
+                    exit()
 
         self._cells.extend(row)
-        print("initialized cells: ", self.get_cells())
-        self.remove_letters_from_domain()
-
-
-        pass
-    
-    def remove_letters_from_domain(self):
-
-        for yellow_letter in self._yellow_letters:
-            for i in range(len(self.get_cells())):
-                if yellow_letter in self.get_cells()[i]:
-                    new_domain = self.get_cells()[i]
-                    self.get_cells()[i] = yellow_letter + new_domain
-
+        
         for i, (domain, grey_letters) in enumerate(zip(self.get_cells(), self.get_grey_letters())):
             if len(self.get_cells()[i]) != 1:
                 self.get_cells()[i] = ''.join([char for char in domain if char not in grey_letters])
         print("Grey letters ", self.get_grey_letters())
 
 
-        # Get a letter from the yellow list
-        # Iterate through list of grey letters
-        # If letter is not in a grey letter list and its domain is not 1, mark that spot down
-        # If letter is not in a grey letter list again and its domain is not 1, we leave the for loop because we haven't guaranteed that there is only 1 option for this yellow letter to be
-        # If it turns out that letter is the only one not in a grey list or not belonging to a cell with domain 1, set the spot we marked down to the letter
+        '''
+        We want to prioritize guessing letters that are yellow, as we know they exist in the word.
+        If a yellow letter exists in the domain of a variable, we add a copy of the letter to the beginning of the domain so that it gets priority in being chosen in the next generated word
+        '''
+        for yellow_letter in self._yellow_letters:
+            for i in range(len(self.get_cells())):
+                if yellow_letter in self.get_cells()[i] and len(self.get_cells()[i]) != 1:
+                    new_domain = self.get_cells()[i]
+                    self.get_cells()[i] = yellow_letter + new_domain
 
+
+        self.check_only_option()
+
+
+        pass
+    
+    def check_only_option(self):
+        '''
+        This function deals with the case where there is only one possible spot a yellow letter can be based off previous guesses.
+        If there is, we set that one possible spot to the yellow letter in question
+
+        For example, we guess:
+        SORER -> result: XXYGG
+        then,
+        PRIER -> result: XYYGG
+
+        We know that the only possible spot for 'R' to be in is in variable 1, the first spot
+        ''' 
         possible_single = 0
         candidate = 0
         letter = 0
@@ -147,7 +156,6 @@ class Word:
             count = 0
             for j in range(len(self.get_grey_letters())):
                 count += 1
-                #print("YELLOW LETTER: " + self.get_yellow_letters()[i] + " | GREY LETTERS: " + self.get_grey_letters()[j] + " | COUNT: " + str(possible_single))
                 if possible_single > 1:
                     break
                 elif self.get_yellow_letters()[i] not in self.get_grey_letters()[j] and len(self.get_cells()[j]) != 1:
@@ -155,18 +163,7 @@ class Word:
                     candidate = j
                     letter = i
             if count == 5 and possible_single == 1:
-                print("HELLOOOOOOOOOOO")
                 self.get_cells()[candidate] = self.get_yellow_letters()[letter]
-                            
-
-
-
-        # If a letter is yellow and is present in grey letter cells where those cells domain's are not 1...
-        # Set the domain of the cell # which domain is not 1, and which the letter is not present in the grey letter cells, to the letter
-        # FOR EXAMPLE:
-        # SORER: XXYGG
-        # PRIER: XYYGG
-        # We know R has to be in the first slot.
 
         pass
 
@@ -210,7 +207,6 @@ class Word:
         copy_word._cells = [cell[:] for cell in self._cells]
         copy_word._yellow_letters = [cell[:] for cell in self._yellow_letters]
         copy_word._grey_letters = [cell[:] for cell in self._grey_letters]
-        #print("Copy cells: ", copy_word.get_cells())
         return copy_word
     
     def get_cells(self):
@@ -224,7 +220,7 @@ class Word:
             return True
         return False
     
-class MRV:
+class VarSelector:
     """
     Implements the MRV heuristic, which returns one of the variables with smallest domain. 
     """
@@ -234,23 +230,23 @@ class MRV:
         smallest_domain = 27
         var = None
         # Iterate through cells
+        print("In varselector: ", word.get_yellow_letters())
+        for yellow_letter in word.get_yellow_letters():
+            for i in range(word.get_width()):
+                print("this: " ,yellow_letter, word.get_cells()[i])
+                if yellow_letter in word.get_cells()[i] and len(word.get_cells()[i]) != 1:
+                    print("Yeah im in here")
+                    return i
+                
         for i in range(word.get_width()):
             if (len(word.get_cells()[i]) < smallest_domain and len(word.get_cells()[i]) != 1):
                 smallest_domain = len(word.get_cells()[i])
                 var = i
 
 
-        for i in range(len(word.get_yellow_letters())):
-            for j in range(word.get_width()):
-                if word.get_yellow_letters()[i] in word.get_cells()[j]:
-                    return j
-
         return var
 
 class AC3:
-
-    def consistency(self, word):
-        pass
 
     def remove_domain_pairs(self, word):
         for i in range(word.get_width()):
@@ -289,40 +285,34 @@ class Backtracking:
         if word.is_solution():
             return word
         
-
         i = var_selector.select_variable(word)
 
+        print("Selector: ", i)
         if i is None:
             return None
         
+        #FIXME: If yellow letters exist, and are put into the word but a word is not found with those combinations (selector is None), try to reset back and try a different combination of the yellow letters
+        # Not quite sure how to logistically do that
+        # For example, Water => xyxyy into rheas -> ygyyy produces SHRUG
+        # A way to fix it would have to be stopping backtracking and re-choosing variables
+
         for letter in word.get_cells()[i]:
-
-
-            #FIXME: Once a yellow letter is set to the cell, we should remove the yellow letter from the front of the domain list to reduce its priority
-
             copy_word = word.copy()
-            print(copy_word.get_cells())
             copy_word.get_cells()[i] = letter
+            print("HERE " , copy_word.get_cells())
             if letter in copy_word.get_yellow_letters():
                 # If the letter selected is in the yellow letter list
                 print(copy_word.get_yellow_letters())
                 copy_word.deprioritize_domain(letter)
                 copy_word.remove_yellow_letters(letter)
 
-
-            # Lets say the word is WATER and the outcome is XXYXX. We put T to the front of the domains of all over variables but the middle one
-            # Whatever variable is next chosen by MRV will be set to T. Now we should remove T from the front of the domain of the other variables.
-            # Perhaps instead of moving the domain of T to the front of the queue we just add it to the front of the queue and keep 2 copies of the T in the domain list?
-            # This way it would be easier to remove from the front of the queue without having to manually re-add it into the domain list.
-
             ac3.remove_domain_pairs(copy_word)
-            #copy_word.remove_letters_from_domain()
 
             print(copy_word.get_cells())
             rb = self.search(copy_word, var_selector, ac3)
             if rb and rb.is_solution():
                 return rb
-
+            
         return None
 
 
@@ -362,12 +352,14 @@ if __name__ == "__main__":
         pair = pair.strip()
         impossible_pairs.append(pair)
 
+    guessed_word = input("Please enter the word you guessed: ").upper()
+
+    if not is_valid_word(guessed_word):
+        exit()
+
     while True:
-        guessed_word = input("Please enter the word you guessed: ").upper()
 
-        if not is_valid_word(guessed_word):
-            break
-
+        print("\nFor the guess: ", guessed_word)
         print("\nPlease indicate the result of your guess")
 
         result_guessed_word = input("X = letter is gray\nY = letter is yellow\nG = letter is green\nOR type 'I WON!' if you won :)\n: ").upper()
@@ -376,15 +368,18 @@ if __name__ == "__main__":
             print("NOT A VALID INPUT")
             break
         
-        # Update the existing Word object with the obtained guess information
 
         word.init_cells(guessed_word, result_guessed_word)
-        #print(word.get_cells())
 
-        mrv = MRV()
+        var_selector = VarSelector()
         ac3 = AC3()
         ac3.remove_domain_pairs(word)
 
         bt = Backtracking()
-        sol = bt.search(word.copy(), mrv, ac3)
-        print(sol.get_cell_string())
+        sol = bt.search(word.copy(), var_selector, ac3)
+        if sol == None:
+            print("No solution found :(")
+            exit()
+        else:
+            print(sol.get_cell_string())
+            guessed_word = sol.get_cell_string()
