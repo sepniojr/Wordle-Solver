@@ -139,7 +139,7 @@ class Word:
     def check_only_option(self):
         '''
         This function deals with the case where there is only one possible spot a yellow letter can be based off previous guesses.
-        If there is, we set that one possible spot to the yellow letter in question
+        If there is, we set the domain of that one possible spot to the yellow letter in question
 
         For example, we guess:
         SORER -> result: XXYGG
@@ -167,6 +167,21 @@ class Word:
 
         pass
 
+    def check_all_variables_assigned(self):
+        for i in range(self.get_width()):
+            if len(self.get_cells()[i]) != 1:
+                return False
+        
+        return True
+    
+    def check_all_yellow_letters_included(self):
+        
+        for i in range(len(self.get_yellow_letters())):
+            if self.get_yellow_letters()[i] not in self.get_cell_string():
+                return False
+            
+        return True
+    
     def deprioritize_domain(self, letter):
         """
         Removes the domain 
@@ -189,6 +204,7 @@ class Word:
         print("NEW DOMAIN AFTER DEPRIO: ", self.get_cells())
 
         
+
 
     def remove_yellow_letters(self, letter):
         self._yellow_letters.remove(letter)
@@ -228,23 +244,31 @@ class VarSelector:
 
         # Set the smallest tentative domain to the largest possible domain
         smallest_domain = 27
-        var = None
-        # Iterate through cells
+        var_smallest_domain = None
+        yellow_letter_count = 100
+        var_least_yellow_letter = None
+
         print("In varselector: ", word.get_yellow_letters())
-        for yellow_letter in word.get_yellow_letters():
+
+        # If there are no yellow letters in the word, pick the variable with the smallest domain
+
+        if not word.get_yellow_letters():
             for i in range(word.get_width()):
-                print("this: " ,yellow_letter, word.get_cells()[i])
-                if yellow_letter in word.get_cells()[i] and len(word.get_cells()[i]) != 1:
-                    print("Yeah im in here")
-                    return i
-                
+                if (len(word.get_cells()[i]) < smallest_domain and len(word.get_cells()[i]) != 1):
+                   smallest_domain = len(word.get_cells()[i])
+                   var_smallest_domain = i
+            return var_smallest_domain
+        
+        # If there are yellow letters in the word, pick the variable with the least of them
         for i in range(word.get_width()):
-            if (len(word.get_cells()[i]) < smallest_domain and len(word.get_cells()[i]) != 1):
-                smallest_domain = len(word.get_cells()[i])
-                var = i
-
-
-        return var
+            temp_count = 0
+            for yellow_letter in word.get_yellow_letters():
+                if yellow_letter in word.get_cells()[i] and len(word.get_cells()[i]) != 1:
+                    temp_count += word.get_cells()[i].count(yellow_letter)
+            if temp_count < yellow_letter_count and temp_count != 0:
+                yellow_letter_count = temp_count
+                var_least_yellow_letter = i
+        return var_least_yellow_letter
 
 class AC3:
 
@@ -279,38 +303,97 @@ class AC3:
         pass
 
 class Backtracking:
+    def __init__(self):
+        self._iteration_count = 0
+        self._initial_domains = []
+        self._initial_yellow_letters = []
+        # Change the selector if the previous search did not yield a valid word
+        self._previous_selector = 0
+
+    def get_iteration_count(self):
+        return self._iteration_count
+    
+    def get_initial_domains(self):
+        return self._initial_domains
+    def get_initial_yellow_letters(self):
+        return self._initial_yellow_letters
+    
+    def copy_initial_domains(self, word):
+        copy_list = word.get_cells().copy()
+        self._initial_domains = copy_list
+        return copy_list
+    
+    def copy_yellow_letters(self,word):
+        copy_list = word.get_yellow_letters().copy()
+        self._initial_yellow_letters = copy_list
+        return copy_list
+    
+    def pre_search(self,word,var_selector,ac3):
+        pass   
 
     def search(self, word, var_selector, ac3):
 
+        if self.get_iteration_count() == 0:
+            print("Copy of domain for word: ",self.copy_initial_domains(word))
+            print("Copy of yellow letters for word:", self.copy_yellow_letters(word))
+            # This is the first iteration
+
+        self._iteration_count += 1
+
         if word.is_solution():
+            print("This is a solution too!")
             return word
-        
+        elif word.check_all_variables_assigned() and not word.is_solution() and not word.check_all_yellow_letters_included():
+            # If the order of the letters does not reach a valid solution, we reset the domains to when the results were first entered
+
+            #FIXME: If all yellow letters are present in the domains of all variables but we still haven't found a word, I still want to search through the domains and try each letter
+            # But only if all yellow letters have been accounted for
+            # How to do this? First check that all yellow letters have been placed first, then once this happens, we can allow the search to loop through all letters for the remaining variables until a valid word is reached
+            #   Multiple options to change outcome of letter search:
+            #   - change selected variable from the one previously selected
+            #   - change order of domain
+
+
+            #FIXME: Also check that all other word attributes are being reset accordinly
+
+            
+            word._cells = self.get_initial_domains()
+            word._yellow_letters = self.get_initial_yellow_letters()
+            print("Resetting initial domains: ", word.get_cells())
+            print("Resetting initial yellows: ", word.get_yellow_letters())
+
+        print(word.get_cells())
         i = var_selector.select_variable(word)
 
         print("Selector: ", i)
+
         if i is None:
+            print(word.get_cell_string())
             return None
         
         #FIXME: If yellow letters exist, and are put into the word but a word is not found with those combinations (selector is None), try to reset back and try a different combination of the yellow letters
         # Not quite sure how to logistically do that
         # For example, Water => xyxyy into rheas -> ygyyy produces SHRUG
         # A way to fix it would have to be stopping backtracking and re-choosing variables
-
+        # Maybe dynamically change the domains of the variables depending on what letters are beside it?
+        
         for letter in word.get_cells()[i]:
             copy_word = word.copy()
             copy_word.get_cells()[i] = letter
-            print("HERE " , copy_word.get_cells())
             if letter in copy_word.get_yellow_letters():
                 # If the letter selected is in the yellow letter list
-                print(copy_word.get_yellow_letters())
                 copy_word.deprioritize_domain(letter)
                 copy_word.remove_yellow_letters(letter)
 
             ac3.remove_domain_pairs(copy_word)
 
+            #print("copy of init domain: ",self.get_initial_domains())
             print(copy_word.get_cells())
+
+
             rb = self.search(copy_word, var_selector, ac3)
             if rb and rb.is_solution():
+                print("This is a solution!")
                 return rb
             
         return None
