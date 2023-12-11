@@ -65,6 +65,7 @@ class Word:
         self._domains = []
         self._cells = []
         self._yellow_letters = []
+        self._first_selected_variable = None
         self._grey_letters = ['','','','','']
         self._complete_domains = ["SPBCMTARDGFLHNWKOEVJUYIZQX",
                                   "AOEIURLHNYTPMCWKSBDGXVFZQJ",
@@ -130,7 +131,7 @@ class Word:
                     new_domain = self.get_cells()[i]
                     self.get_cells()[i] = yellow_letter + new_domain
 
-
+        print(self.get_yellow_letters())
         self.check_only_option()
 
 
@@ -151,6 +152,7 @@ class Word:
         possible_single = 0
         candidate = 0
         letter = 0
+        letters_to_remove =[]
 
         for i in range(len(self.get_yellow_letters())):
             count = 0
@@ -164,6 +166,12 @@ class Word:
                     letter = i
             if count == 5 and possible_single == 1:
                 self.get_cells()[candidate] = self.get_yellow_letters()[letter]
+                print("In only option:",letter,self.get_cells(),self.get_yellow_letters())
+                if self.get_yellow_letters()[letter] in self.get_yellow_letters():
+                    letters_to_remove.append(self.get_yellow_letters()[letter])
+
+        for letter in letters_to_remove:
+            self.remove_yellow_letters(letter)
 
         pass
 
@@ -194,17 +202,15 @@ class Word:
                 continue
             if self.get_cells()[i].count(letter) != 1:
                 index = self.get_cells()[i].find(letter)
-                print(i,index)
+                #print(i,index)
                 if index != -1:
                     new_domain = self.get_cells()[i].replace(letter, '',1)
                     self.get_cells()[i] = new_domain
 
         
-        #FIXME: Might be removing all instances of the letter instead of just the first one
         print("NEW DOMAIN AFTER DEPRIO: ", self.get_cells())
 
         
-
 
     def remove_yellow_letters(self, letter):
         self._yellow_letters.remove(letter)
@@ -218,11 +224,15 @@ class Word:
     def get_cell_string(self):
         return ''.join(self.get_cells())
 
+    def get_first_selected_variable(self):
+        return self._first_selected_variable
+    
     def copy(self):
         copy_word = Word()
         copy_word._cells = [cell[:] for cell in self._cells]
         copy_word._yellow_letters = [cell[:] for cell in self._yellow_letters]
         copy_word._grey_letters = [cell[:] for cell in self._grey_letters]
+        copy_word._first_selected_variable = self._first_selected_variable
         return copy_word
     
     def get_cells(self):
@@ -240,23 +250,23 @@ class VarSelector:
     """
     Implements the MRV heuristic, which returns one of the variables with smallest domain. 
     """
-    def select_variable(self, word):
+    def select_variable(self, word, var):
 
         # Set the smallest tentative domain to the largest possible domain
         smallest_domain = 27
         var_smallest_domain = None
         yellow_letter_count = 100
         var_least_yellow_letter = None
-
         print("In varselector: ", word.get_yellow_letters())
 
         # If there are no yellow letters in the word, pick the variable with the smallest domain
 
         if not word.get_yellow_letters():
             for i in range(word.get_width()):
-                if (len(word.get_cells()[i]) < smallest_domain and len(word.get_cells()[i]) != 1):
+                if (len(word.get_cells()[i]) < smallest_domain and len(word.get_cells()[i]) != 1) and i != var:
                    smallest_domain = len(word.get_cells()[i])
                    var_smallest_domain = i
+
             return var_smallest_domain
         
         # If there are yellow letters in the word, pick the variable with the least of them
@@ -265,8 +275,9 @@ class VarSelector:
             for yellow_letter in word.get_yellow_letters():
                 if yellow_letter in word.get_cells()[i] and len(word.get_cells()[i]) != 1:
                     temp_count += word.get_cells()[i].count(yellow_letter)
-            if temp_count < yellow_letter_count and temp_count != 0:
+            if temp_count < yellow_letter_count and temp_count != 0 and i != var:
                 yellow_letter_count = temp_count
+                print(f"Variable can't be {var} and we have {i}")
                 var_least_yellow_letter = i
         return var_least_yellow_letter
 
@@ -307,14 +318,18 @@ class Backtracking:
         self._iteration_count = 0
         self._initial_domains = []
         self._initial_yellow_letters = []
+        self._dont_try_vars = []
         # Change the selector if the previous search did not yield a valid word
-        self._previous_selector = 0
 
+    def get_dont_try_vars(self):
+        return self._dont_try_vars
+    
     def get_iteration_count(self):
         return self._iteration_count
     
     def get_initial_domains(self):
         return self._initial_domains
+    
     def get_initial_yellow_letters(self):
         return self._initial_yellow_letters
     
@@ -328,9 +343,6 @@ class Backtracking:
         self._initial_yellow_letters = copy_list
         return copy_list
     
-    def pre_search(self,word,var_selector,ac3):
-        pass   
-
     def search(self, word, var_selector, ac3):
 
         if self.get_iteration_count() == 0:
@@ -346,26 +358,30 @@ class Backtracking:
         elif word.check_all_variables_assigned() and not word.is_solution() and not word.check_all_yellow_letters_included():
             # If the order of the letters does not reach a valid solution, we reset the domains to when the results were first entered
 
-            #FIXME: If all yellow letters are present in the domains of all variables but we still haven't found a word, I still want to search through the domains and try each letter
-            # But only if all yellow letters have been accounted for
-            # How to do this? First check that all yellow letters have been placed first, then once this happens, we can allow the search to loop through all letters for the remaining variables until a valid word is reached
-            #   Multiple options to change outcome of letter search:
-            #   - change selected variable from the one previously selected
-            #   - change order of domain
-
-
-            #FIXME: Also check that all other word attributes are being reset accordinly
-
-            
+            # Have a list of variables thatr we don't want the search to try first
+            # If we end up in this elif statement, we add the selected variable we last tried to the list of Don't Trys
+            # C
+            self.get_dont_try_vars().append(word.get_first_selected_variable())
+            print("don't try vars: ",self.get_dont_try_vars())
             word._cells = self.get_initial_domains()
             word._yellow_letters = self.get_initial_yellow_letters()
             print("Resetting initial domains: ", word.get_cells())
             print("Resetting initial yellows: ", word.get_yellow_letters())
 
-        print(word.get_cells())
-        i = var_selector.select_variable(word)
+        if not self.get_dont_try_vars():
+            # If list is empty we do as normal
+            i = var_selector.select_variable(word, None)
+        else:
+            i = var_selector.select_variable(word, word.get_first_selected_variable())
+            word._first_selected_variable = None
+
+
+        if word.get_first_selected_variable() is None:
+            word._first_selected_variable = i
+            print("Setting first selected variable: ", word.get_first_selected_variable())
 
         print("Selector: ", i)
+
 
         if i is None:
             print(word.get_cell_string())
