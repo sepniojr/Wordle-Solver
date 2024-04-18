@@ -12,9 +12,9 @@ With Wordle open in your browser, you will make your first guess on the Wordle w
 
 You must then indicate the result of this guess, by entering a 5-letter string which contains X's, Y's, and G's:
 
-X = letter is gray
-Y = letter is yellow
-G = letter is green
+-   X = letter is gray
+-   Y = letter is yellow
+-   G = letter is green
 
 After entering the result of the guess, the program will offer the next word to guess. Do this enough times, and hopefully you will get the right answer!
 
@@ -28,5 +28,5 @@ If I ever revisit this project, I think it would be interesting to look into dif
 
 # Acknowledgements
 
-https://www.jojhelfer.com/lettercombos : This was a super helpful resource for doing pre-processing on words and reducing the domain of letters.
-https://gist.github.com/dracos/dd0668f281e685bad51479e5acaadb93 : A list of the possible Wordle words, which made this whole project possible.
+-   https://www.jojhelfer.com/lettercombos : This was a super helpful resource for doing pre-processing on words and reducing the domain of letters.
+-   https://gist.github.com/dracos/dd0668f281e685bad51479e5acaadb93 : A list of the possible Wordle words, which made this whole project possible.
